@@ -171,6 +171,7 @@ class openurl:
 		book_name = self.get_bookname()
 		burl = 'https://www.shuquge.com/search.php'
 		for j in book_name:
+			#搜索书籍用post方法，需要添加data参数，否则会搜索不到，通过F12查看
 			params = {'searchkey':j,'s':'6445266503022880974'}
 			potxt = self.post_url(burl,params)
 			if potxt == 1:
@@ -292,7 +293,7 @@ def main():
 	inita = openurl()
 	if os.path.exists('book.db'):
 		os.remove('book.db')
-	#检查数据库表是否存在
+	#检查数据库表是否存在，不存在就初始化数据库表
 	sql = 'select count(*) from BOOKINFO'
 	retxt = inita.get_db(sql)
 	if retxt == 1:
