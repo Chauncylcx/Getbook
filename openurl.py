@@ -39,7 +39,7 @@ class openurl:
 		randdom_agent = random.choice(self.headers)
 		return randdom_agent
 
-	#获取可用代理IP并写入txt文件
+	#为了控制访问代理IP网站的频率，获取可用代理IP后写入txt文件,此后每次访问直接从本地文件随机抽取一个IP
 	def get_proxyip(self):
 		proxyip=[]
 		url = 'https://ip.jiangxianli.com/api/proxy_ips'
@@ -62,7 +62,7 @@ class openurl:
 		proxy_data[proiphttp] = randdom_ip
 		return proxy_data
 
-	#get网页函数
+	#get网页函数，若失败超过5次就退出
 	def get_url(self,url):
 		proxy_data = self.reget_ip()
 		attempts = 0
@@ -73,13 +73,14 @@ class openurl:
 				success = True
 			except:
 				attempts += 1
+				#访问时有可能是代理IP失效，失败后换一个代理IP试试
 				proxy_data = self.reget_ip()
 				if attempts == 5:
 					r = 1
 					break
 		return r
 	
-	#post网页函数
+	#post网页函数，若失败超过5次就退出
 	def post_url(self,url,data):
 		proxy_data = self.reget_ip()
 		attempts = 0
@@ -90,13 +91,15 @@ class openurl:
 				success = True
 			except:
 				attempts += 1
+				#访问时有可能是代理IP失效，失败后换一个代理IP试试
 				proxy_data = self.reget_ip()
 				if attempts == 5:
 					r = 1
 					break
 		return r
 
-	#初始化sqlite3数据表
+	#初始化sqlite3数据表，主要临时存放书籍信息
+	#随机ID，书籍章节序号，书名，书籍章节名，章节内容
 	def init_db(self):
 		try:
 			conn = sqlite3.connect('book.db')
@@ -147,6 +150,7 @@ class openurl:
 	#从起点获取排行榜上的书名
 	def get_bookname(self):
 		bookname = []
+		#控制爬取页面的数量，每页至少由10本小说，10页可查询排名前100的书籍
 		for i in range(1,10):
 			url = 'https://www.qidian.com/rank/collect/page{}/'.format(i)
 			retxt = self.get_url(url)
@@ -177,13 +181,14 @@ class openurl:
 			aobje = soup.find_all('div',class_='bookbox')
 			num=0
 			for li in aobje:
+				#搜索出来的书籍可能会有重名，但一般第一本书籍就是我们需要的
 				if num >= 1:
 					break
 				a = li.find('a')
 				templink=(a['href'])
 				num+=1
 			booklink[j] = 'https://www.shuquge.com' + templink
-		print('从书趣阁搜索书名的链接地址完成...')
+		print('书名地址搜索完成...')
 		return booklink
 
 	#获取章节名称和章节链接
@@ -191,8 +196,9 @@ class openurl:
 		booklink = self.post_bookname()
 		print('开始爬取书籍章节...')
 		apnum = 1
+		#循环爬取每本书籍
 		for k,v in booklink.items():
-			#控制爬取书籍的数量
+			#控制爬取书籍的数量，若不控制可去掉下面两行
 			if apnum >= 30:
 				continue
 			pageinfo = []
@@ -205,13 +211,14 @@ class openurl:
 			aobje = soup.find_all('dd')
 			rlink = v.replace('index.html','')
 			inde = 1
+			#pageinfo保存每本书籍的章节名称、链接地址、章节编号、书名
 			for i in aobje:
 				a = i.find('a')
 				ilink = rlink + (a['href'])
 				iname = "".join((a.string).split())
 				pageinfo.append([ilink,iname,inde,k])
 				inde+=1
-			#使用队列为多线程服务
+			#将pageinfo信息写入队列中
 			q = queue.Queue()
 			for i in pageinfo:
 				q.put((i[0],i[1],i[2],i[3]))
@@ -219,6 +226,7 @@ class openurl:
 			thread_num = 5
 			threads = []
 			start = time.time()
+			#将队列写入线程
 			for i in range(len(pageinfo)):
 				threads.append(
 					threading.Thread(target=self.get_pageinfo,args=(q,))
@@ -237,6 +245,7 @@ class openurl:
 	def get_pageinfo(self,q):
 		#开始获取章节内容
 		while True:
+			#如果队列为空就退出
 			if q.empty():
 				return
 			else:
@@ -251,7 +260,9 @@ class openurl:
 				pagebook.encoding = 'UTF-8-SIG'
 				soup = BeautifulSoup(pagebook.text,'html.parser')
 				aobje = soup.find_all('div',class_='showtxt')
+				#过滤一些不需要的文本
 				aastr = str(aobje[0]).replace('<br/>','').replace('<div class="showtxt" id="content">','').replace(ilink,'').replace('请记住本书首发域名：www.shuquge.com。书趣阁_笔趣阁手机版阅读网址：m.shuquge.com','').replace('</div>','').replace('\xa0\xa0\xa0','\r\n').replace('\n','')
+				#将每个章节信息写入sqlite3数据库
 				sql = 'insert or ignore into bookinfo(bookname,bookid,booksub,booktext) values (\'%s\',\'%r\',\'%s\',\'%s\')'%(ibookname,inum,iname,aastr)
 				retxt = self.post_db(sql)
 				if retxt == 1:
