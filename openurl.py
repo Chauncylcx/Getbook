@@ -147,7 +147,7 @@ class openurl:
 	#从起点获取排行榜上的书名
 	def get_bookname(self):
 		bookname = []
-		for i in range(1,2):
+		for i in range(1,10):
 			url = 'https://www.qidian.com/rank/collect/page{}/'.format(i)
 			retxt = self.get_url(url)
 			if retxt == 1:
@@ -193,7 +193,7 @@ class openurl:
 		apnum = 1
 		for k,v in booklink.items():
 			#控制爬取书籍的数量
-			if apnum >= 3:
+			if apnum >= 30:
 				continue
 			pageinfo = []
 			bobkindex = self.get_url(v)
