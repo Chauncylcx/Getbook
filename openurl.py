@@ -1,6 +1,7 @@
 # info: download books program
 # author: Chauncy Liu
 # date: 2021/08/05
+# -*- coding: UTF-8 -*- 
 
 import requests
 import random
@@ -151,7 +152,7 @@ class openurl:
 	def get_bookname(self):
 		bookname = []
 		#控制爬取页面的数量，每页至少由10本小说，10页可查询排名前100的书籍
-		for i in range(1,10):
+		for i in range(1,2):
 			url = 'https://www.qidian.com/rank/collect/page{}/'.format(i)
 			retxt = self.get_url(url)
 			if retxt == 1:
@@ -169,26 +170,27 @@ class openurl:
 	def post_bookname(self):
 		booklink = {}
 		book_name = self.get_bookname()
-		burl = 'https://www.shuquge.com/search.php'
+		burl = 'https://www.biqooge.com/modules/article/search.php'
 		for j in book_name:
 			#搜索书籍用post方法，需要添加data参数，否则会搜索不到，通过F12查看
-			params = {'searchkey':j,'s':'6445266503022880974'}
+			params = {'searchkey':j.encode("gbk"),'searchtype':'articlename','action':'login','submit':j.encode("gbk")}
 			potxt = self.post_url(burl,params)
 			if potxt == 1:
 				print('爬取网页时出错，已跳过，链接为：{}'.fromat(url))
 				continue
-			potxt.encoding = 'UTF-8-SIG'
+			potxt.encoding = 'gbk'
 			soup = BeautifulSoup(potxt.text,'html.parser')	
-			aobje = soup.find_all('div',class_='bookbox')
-			num=0
-			for li in aobje:
-				#搜索出来的书籍可能会有重名，但一般第一本书籍就是我们需要的
-				if num >= 1:
+			titlename = soup.title.string
+			if titlename.find('搜索') > 0:
+				aobje = soup.find_all('td',class_='odd')
+				for ai in aobje:
+					a = ai.find('a')
+					templink = (a['href'])
+					booklink[j] = templink
 					break
-				a = li.find('a')
-				templink=(a['href'])
-				num+=1
-			booklink[j] = 'https://www.shuquge.com' + templink
+			else:
+				templink = soup.find(attrs={"property":"og:novel:read_url"})['content']
+				booklink[j] = templink
 		print('书名地址搜索完成...')
 		return booklink
 
@@ -200,25 +202,28 @@ class openurl:
 		#循环爬取每本书籍
 		for k,v in booklink.items():
 			#控制爬取书籍的数量，若不控制可去掉下面两行
-			if apnum >= 30:
+			if apnum >= 10:
 				continue
 			pageinfo = []
 			bobkindex = self.get_url(v)
 			if bobkindex == 1:
 				print('爬取网页时出错，已跳过，链接为：{}'.fromat(v))
 				continue
-			bobkindex.encoding = 'UTF-8-SIG'
+			bobkindex.encoding = 'gbk'
 			soup = BeautifulSoup(bobkindex.text,'html.parser')
 			aobje = soup.find_all('dd')
-			rlink = v.replace('index.html','')
+			rlink = 'https://www.biqooge.com'
 			inde = 1
 			#pageinfo保存每本书籍的章节名称、链接地址、章节编号、书名
 			for i in aobje:
 				a = i.find('a')
 				ilink = rlink + (a['href'])
-				iname = "".join((a.string).split())
-				pageinfo.append([ilink,iname,inde,k])
+				iname = a.string
+				#去掉前9章，后面才是正文
+				if inde > 9:
+					pageinfo.append([ilink,iname,inde,k])
 				inde+=1
+
 			#将pageinfo信息写入队列中
 			q = queue.Queue()
 			for i in pageinfo:
@@ -240,6 +245,7 @@ class openurl:
 				threads[i].join()
 			end = time.time()
 			print(k,'爬取运行时间：',end-start,'秒')
+			
 			apnum+=1
 
 	#获取章节内容
@@ -258,11 +264,10 @@ class openurl:
 				pagebook = self.get_url(ilink)
 				if pagebook == 1:
 					print('爬取网页时出错，已跳过，链接为：{}'.fromat(ilink))
-				pagebook.encoding = 'UTF-8-SIG'
+				pagebook.encoding = 'gbk'
 				soup = BeautifulSoup(pagebook.text,'html.parser')
-				aobje = soup.find_all('div',class_='showtxt')
-				#过滤一些不需要的文本
-				aastr = str(aobje[0]).replace('<br/>','').replace('<div class="showtxt" id="content">','').replace(ilink,'').replace('请记住本书首发域名：www.shuquge.com。书趣阁_笔趣阁手机版阅读网址：m.shuquge.com','').replace('</div>','').replace('\xa0\xa0\xa0','\r\n').replace('\n','')
+				aobje = soup.find_all('div',id='content')
+				aastr = str(aobje[0]).replace('<br/>','').replace('<div id="content">','').replace('</div>','')				
 				#将每个章节信息写入sqlite3数据库
 				sql = 'insert or ignore into bookinfo(bookname,bookid,booksub,booktext) values (\'%s\',\'%r\',\'%s\',\'%s\')'%(ibookname,inum,iname,aastr)
 				retxt = self.post_db(sql)
@@ -284,8 +289,8 @@ def exp_db():
 		bookname = str(retxt[0][0]) + '.txt'
 		with open(bookname,'w',encoding='utf8') as f:
 			for i in retxt:
-				atite ='\r' +  i[1] + '\r'
-				atext = i[2]
+				atite ='\r\n' + i[1] + '\r\n\n'
+				atext = str(i[2]).replace('</div>','')
 				f.write(atite)
 				f.write(atext)
 
@@ -307,4 +312,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
+	exp_db()
