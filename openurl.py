@@ -312,4 +312,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-	exp_db()
