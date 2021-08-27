@@ -232,6 +232,10 @@ class openurl:
 			thread_num = 5
 			threads = []
 			start = time.time()
+			#如果没有章节，则跳过此书籍
+			if len(pageinfo) == 0:
+				apnum+=1
+				continue
 			#将队列写入线程
 			for i in range(len(pageinfo)):
 				threads.append(
