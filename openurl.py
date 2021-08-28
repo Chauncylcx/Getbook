@@ -198,6 +198,13 @@ class openurl:
 	def get_bookindex(self):
 		booklink = self.post_bookname()
 		print('开始爬取书籍章节...')
+		#检查数据库表是否存在，不存在就初始化数据库表
+		if os.path.exists('book.db'):
+			os.remove('book.db')
+		sql = 'select count(*) from BOOKINFO'
+		retxt = inita.get_db(sql)
+		if retxt == 1:
+			self.init_db()
 		apnum = 1
 		#循环爬取每本书籍
 		for k,v in booklink.items():
@@ -300,13 +307,6 @@ def exp_db():
 
 def main():
 	inita = openurl()
-	if os.path.exists('book.db'):
-		os.remove('book.db')
-	#检查数据库表是否存在，不存在就初始化数据库表
-	sql = 'select count(*) from BOOKINFO'
-	retxt = inita.get_db(sql)
-	if retxt == 1:
-		inita.init_db()
 	#获取代理IP
 	inita.get_proxyip()
 	#开始爬取小说
