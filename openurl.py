@@ -322,7 +322,7 @@ class openurl:
 def main():
 	inita = openurl()
 	#获取代理IP
-	#inita.get_proxyip()
+	inita.get_proxyip()
 	#开始爬取小说
 	inita.get_bookindex()
 	#导出数据生成txt文件
