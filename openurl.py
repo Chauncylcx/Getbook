@@ -152,7 +152,7 @@ class openurl:
 	def get_bookname(self):
 		bookname = []
 		#控制爬取页面的数量，每页至少由10本小说，10页可查询排名前100的书籍
-		for i in range(1,2):
+		for i in range(7,8):
 			url = 'https://www.qidian.com/rank/collect/page{}/'.format(i)
 			retxt = self.get_url(url)
 			if retxt == 1:
@@ -202,14 +202,14 @@ class openurl:
 		if os.path.exists('book.db'):
 			os.remove('book.db')
 		sql = 'select count(*) from BOOKINFO'
-		retxt = inita.get_db(sql)
+		retxt = self.get_db(sql)
 		if retxt == 1:
 			self.init_db()
 		apnum = 1
 		#循环爬取每本书籍
 		for k,v in booklink.items():
 			#控制爬取书籍的数量，若不控制可去掉下面两行
-			if apnum >= 10:
+			if apnum > 10:
 				continue
 			pageinfo = []
 			bobkindex = self.get_url(v)
@@ -239,7 +239,7 @@ class openurl:
 			thread_num = 5
 			threads = []
 			start = time.time()
-			#如果没有章节，则跳过此书籍
+			#如果章节为空则跳过此书籍
 			if len(pageinfo) == 0:
 				apnum+=1
 				continue
@@ -248,6 +248,7 @@ class openurl:
 				threads.append(
 					threading.Thread(target=self.get_pageinfo,args=(q,))
 				)
+
 			#启动线程
 			for i in range(thread_num):
 				threads[i].start()
@@ -258,6 +259,17 @@ class openurl:
 			print(k,'爬取运行时间：',end-start,'秒')
 			
 			apnum+=1
+
+			#爬取完一本书籍后生成一本完整的书籍
+			sql = 'select bookname,booksub,booktext from bookinfo where bookname="%s" order by bookname,bookid'%k
+			retxt = self.get_db(sql)
+			bookname = str(retxt[0][0]) + '.txt'
+			with open(bookname,'w',encoding='utf8') as f:
+				for i in retxt:
+					atite ='\r\n' + i[1] + '\r\n\n'
+					atext = str(i[2]).replace('</div>','')
+					f.write(atite)
+					f.write(atext)
 
 	#获取章节内容
 	def get_pageinfo(self,q):
@@ -287,32 +299,34 @@ class openurl:
 				else:
 					print('已保存章节：' + ibookname + iname)
 
-def exp_db():
-	#查询书名时去掉重复
-	sql = 'select distinct bookname from bookinfo order by bookname,bookid'
-	rebookname = openurl().get_db(sql)
-	if rebookname == 1:
-		print('导出数据时出错...')
-		exit()
-	for i in rebookname:
-		sql = 'select bookname,booksub,booktext from bookinfo where bookname="%s" order by bookname,bookid'%i
-		retxt = openurl().get_db(sql)
-		bookname = str(retxt[0][0]) + '.txt'
-		with open(bookname,'w',encoding='utf8') as f:
-			for i in retxt:
-				atite ='\r\n' + i[1] + '\r\n\n'
-				atext = str(i[2]).replace('</div>','')
-				f.write(atite)
-				f.write(atext)
+	#全部书籍爬取完成后再生成书籍
+	#默认关闭，而是在每本书籍爬取后就生成
+	def exp_db(self):
+		#查询书名时去掉重复
+		sql = 'select distinct bookname from bookinfo order by bookname,bookid'
+		rebookname = self.get_db(sql)
+		if rebookname == 1:
+			print('导出数据时出错...')
+			exit()
+		for i in rebookname:
+			sql = 'select bookname,booksub,booktext from bookinfo where bookname="%s" order by bookname,bookid'%i
+			retxt = self.get_db(sql)
+			bookname = str(retxt[0][0]) + '.txt'
+			with open(bookname,'w',encoding='utf8') as f:
+				for i in retxt:
+					atite ='\r\n' + i[1] + '\r\n\n'
+					atext = str(i[2]).replace('</div>','')
+					f.write(atite)
+					f.write(atext)
 
 def main():
 	inita = openurl()
 	#获取代理IP
-	inita.get_proxyip()
+	#inita.get_proxyip()
 	#开始爬取小说
 	inita.get_bookindex()
 	#导出数据生成txt文件
-	exp_db()
+	#inita.exp_db()
 
 if __name__ == '__main__':
 	main()
